@@ -3,8 +3,6 @@ import pool from "./db.js";
 
 const app = express();
 
-const tasks = [];
-
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -12,29 +10,131 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/tasks", async (req, res) => {
-  const result = await pool.query("SELECT * FROM tasks");
+  try {
+    const result = await pool.query("SELECT * FROM tasks");
 
-  res.json(result.rows);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
 });
 
-app.get("/api/tasks/:id", (req, res) => {
+app.get("/api/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
 
-  res.json({
-    message: "Task requested",
-    id: req.params.id,
-  });
+    const result = await pool.query(
+      "SELECT * FROM tasks WHERE id = $1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Task not found",
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+
+app.patch("/api/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, completed } = req.body;
+
+    if (!title || title.trim() === "") {
+      return res.status(400).json({
+        error: "Title is required",
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE tasks
+       SET title = $1,
+           description = $2,
+           completed = $3
+       WHERE id = $4
+       RETURNING *`,
+      [title, description, completed, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Task not found",
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+
+app.delete("/api/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM tasks WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Task not found",
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
 });
 
 app.post("/api/tasks", async (req, res) => {
-  const { title, description } = req.body;
+  try {
+    const { title, description } = req.body;
 
-  const result = await pool.query(
-    "INSERT INTO tasks (title, description) VALUES ($1, $2) RETURNING *",
-    [title, description]
-  );
+    if (!title || title.trim() === "") {
+      return res.status(400).json({
+        error: "Title is required",
+      });
+    }
 
-  res.status(201).json(result.rows[0]);
+    const result = await pool.query(
+      "INSERT INTO tasks (title, description) VALUES ($1, $2) RETURNING *",
+      [title, description]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
 });
+
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");
