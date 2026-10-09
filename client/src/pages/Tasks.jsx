@@ -1,26 +1,18 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 function Tasks() {
-  const tasks = [
-    {
-      id: 1,
-      title: "Learn React",
-      description: "Review React fundamentals",
-      completed: true,
-    },
-    {
-      id: 2,
-      title: "Build Task Manager",
-      description: "Create the frontend",
-      completed: false,
-    },
-    {
-      id: 3,
-      title: "Learn PostgreSQL",
-      description: "Practice SQL queries",
-      completed: false,
-    },
-  ];
+  const [tasks, setTasks] = useState([]);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/tasks")
+        .then((response) => response.json())
+        .then((data) => setTasks(data))
+        .catch((error) => console.error(error));
+      
+      
+  }, []);
+
 
   return (
     <div className="mx-auto max-w-4xl p-6">

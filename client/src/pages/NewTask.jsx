@@ -1,16 +1,34 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function NewTask() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
-  function handleSubmit(event) {
-    event.preventDefault();
+  const navigate= useNavigate();
 
-    console.log({
-      title,
-      description,
-    });
+  async function handleSubmit(e){
+    e.preventDefault();
+    
+    try {
+      const response = await fetch("http://localhost:5000/api/tasks", {
+      method: 'POST',
+      headers: {
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({ title, description })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    navigate('/tasks');
+    
+    const responseData = await response.json();
+    console.log('Success:', responseData);
+    } catch (error) {
+      console.error('Error:', error);
+    }
   }
 
   return (
