@@ -70,13 +70,14 @@ app.get("/api/tasks", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/tasks/:id", async (req, res) => {
+
+app.get("/api/tasks/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
     const result = await pool.query(
-      "SELECT * FROM tasks WHERE id = $1",
-      [id]
+      "SELECT * FROM tasks WHERE id = $1 AND user_id = $2",
+      [id, req.session.userId]
     );
 
     if (result.rows.length === 0) {
@@ -88,14 +89,14 @@ app.get("/api/tasks/:id", async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       error: "Internal server error",
     });
   }
 });
 
-app.patch("/api/tasks/:id", async (req, res) => {
+
+app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, completed } = req.body;
@@ -111,9 +112,9 @@ app.patch("/api/tasks/:id", async (req, res) => {
        SET title = $1,
            description = $2,
            completed = $3
-       WHERE id = $4
+       WHERE id = $4 AND user_id = $5
        RETURNING *`,
-      [title, description, completed, id]
+      [title, description, completed, id, req.session.userId]
     );
 
     if (result.rows.length === 0) {
@@ -125,20 +126,20 @@ app.patch("/api/tasks/:id", async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       error: "Internal server error",
     });
   }
 });
 
-app.delete("/api/tasks/:id", async (req, res) => {
+
+app.delete("/api/tasks/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
     const result = await pool.query(
-      "DELETE FROM tasks WHERE id = $1 RETURNING *",
-      [id]
+      "DELETE FROM tasks WHERE id = $1 AND user_id = $2 RETURNING *",
+      [id, req.session.userId]
     );
 
     if (result.rows.length === 0) {
@@ -150,7 +151,6 @@ app.delete("/api/tasks/:id", async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       error: "Internal server error",
     });
@@ -183,6 +183,7 @@ app.post("/api/tasks", requireAuth, async (req, res) => {
     });
   }
 });
+
 
 app.post("/api/auth/register", async (req, res) => {
   try {
@@ -227,9 +228,23 @@ app.post("/api/auth/register", async (req, res) => {
       [normalizedEmail, passwordHash]
     );
 
-    return res.status(201).json({
-      message: "Account created successfully",
-      user: result.rows[0],
+    const user = result.rows[0];
+
+    req.session.userId = user.id;
+
+    req.session.save((error) => {
+      if (error) {
+        console.error("Registration session error:", error);
+
+        return res.status(500).json({
+          error: "Account created, but login failed. Please log in.",
+        });
+      }
+
+      return res.status(201).json({
+        message: "Account created and logged in successfully",
+        user,
+      });
     });
   } catch (error) {
     console.error("Registration error:", error);
